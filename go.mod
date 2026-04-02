@@ -17,7 +17,7 @@ require (
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/google/pprof v0.0.0-20260202012954-cb029daf43ef // indirect
+	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
