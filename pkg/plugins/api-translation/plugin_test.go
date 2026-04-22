@@ -22,10 +22,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	ctrlbuilder "sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/gateway-api-inference-extension/pkg/bbr/framework"
 
 	"github.com/opendatahub-io/ai-gateway-payload-processing/pkg/plugins/common/state"
 )
+
+func newTestPlugin() *APITranslationPlugin {
+	p, _ := NewAPITranslationPlugin(context.Background(), apiTranslationConfig{})
+	return p
+}
 
 func newCycleStateWithProvider(providerName string) *framework.CycleState {
 	cs := framework.NewCycleState()
@@ -34,7 +41,7 @@ func newCycleStateWithProvider(providerName string) *framework.CycleState {
 }
 
 func TestProcessRequest_NoProvider(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	req := framework.NewInferenceRequest()
 	req.Body["model"] = "gpt-4o"
@@ -46,7 +53,7 @@ func TestProcessRequest_NoProvider(t *testing.T) {
 }
 
 func TestProcessRequest_OpenAIProvider(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("openai")
 	req := framework.NewInferenceRequest()
@@ -59,7 +66,7 @@ func TestProcessRequest_OpenAIProvider(t *testing.T) {
 }
 
 func TestProcessRequest_AnthropicProvider(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("anthropic")
 	req := framework.NewInferenceRequest()
@@ -96,7 +103,7 @@ func TestProcessRequest_AnthropicProvider(t *testing.T) {
 }
 
 func TestProcessRequest_AzureOpenAIProvider(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("azure-openai")
 	req := framework.NewInferenceRequest()
@@ -131,7 +138,7 @@ func TestProcessRequest_AzureOpenAIProvider(t *testing.T) {
 }
 
 func TestProcessResponse_AzureOpenAI_CleanResponse(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("azure-openai")
 	cs.Write(state.ModelKey, "gpt-4o")
@@ -163,7 +170,7 @@ func TestProcessResponse_AzureOpenAI_CleanResponse(t *testing.T) {
 }
 
 func TestProcessResponse_AzureOpenAI_StripsProviderFields(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("azure-openai")
 	cs.Write(state.ModelKey, "gpt-4o")
@@ -223,7 +230,7 @@ func TestProcessResponse_AzureOpenAI_StripsProviderFields(t *testing.T) {
 }
 
 func TestProcessRequest_UnknownProvider(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("unknown")
 	req := framework.NewInferenceRequest()
@@ -237,7 +244,7 @@ func TestProcessRequest_UnknownProvider(t *testing.T) {
 }
 
 func TestProcessResponse_Anthropic(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("anthropic")
 	cs.Write(state.ModelKey, "claude-sonnet-4-20250514")
@@ -275,7 +282,7 @@ func TestProcessResponse_Anthropic(t *testing.T) {
 }
 
 func TestProcessResponse_AnthropicError(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("anthropic")
 
@@ -295,7 +302,7 @@ func TestProcessResponse_AnthropicError(t *testing.T) {
 }
 
 func TestProcessResponse_AnthropicToolUse(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("anthropic")
 	cs.Write(state.ModelKey, "claude-sonnet-4-20250514")
@@ -337,7 +344,8 @@ func TestProcessResponse_AnthropicToolUse(t *testing.T) {
 }
 
 func TestProcessRequest_VertexProvider(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	t.Skip("vertex (native GenerateContent) provider commented out — not used in 3.4 ExternalModel flow")
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("vertex")
 	req := framework.NewInferenceRequest()
@@ -381,7 +389,8 @@ func TestProcessRequest_VertexProvider(t *testing.T) {
 }
 
 func TestProcessResponse_Vertex(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	t.Skip("vertex (native GenerateContent) provider commented out — not used in 3.4 ExternalModel flow")
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("vertex")
 	cs.Write(state.ModelKey, "gemini-2.5-flash")
@@ -425,7 +434,8 @@ func TestProcessResponse_Vertex(t *testing.T) {
 }
 
 func TestProcessResponse_VertexError(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	t.Skip("vertex (native GenerateContent) provider commented out — not used in 3.4 ExternalModel flow")
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("vertex")
 
@@ -446,7 +456,8 @@ func TestProcessResponse_VertexError(t *testing.T) {
 }
 
 func TestProcessResponse_VertexToolCall(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	t.Skip("vertex (native GenerateContent) provider commented out — not used in 3.4 ExternalModel flow")
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("vertex")
 	cs.Write(state.ModelKey, "gemini-2.5-flash")
@@ -493,7 +504,7 @@ func TestProcessResponse_VertexToolCall(t *testing.T) {
 }
 
 func TestProcessResponse_NoProviderPassthrough(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	resp := framework.NewInferenceResponse()
 	resp.Body["object"] = "chat.completion"
@@ -507,7 +518,7 @@ func TestProcessResponse_NoProviderPassthrough(t *testing.T) {
 }
 
 func TestProcessResponse_OpenAIPassthrough(t *testing.T) {
-	p := NewAPITranslationPlugin()
+	p := newTestPlugin()
 
 	cs := newCycleStateWithProvider("openai")
 
@@ -520,8 +531,14 @@ func TestProcessResponse_OpenAIPassthrough(t *testing.T) {
 }
 
 func TestFactory_Success(t *testing.T) {
-	p, err := APITranslationFactory("test-instance", nil, nil)
+	p, err := APITranslationFactory("test-instance", nil, &testHandle{})
 	require.NoError(t, err)
 	assert.Equal(t, "test-instance", p.TypedName().Name)
 	assert.Equal(t, APITranslationPluginType, p.TypedName().Type)
 }
+
+type testHandle struct{}
+
+func (h *testHandle) Context() context.Context                { return context.Background() }
+func (h *testHandle) ClientReader() client.Reader             { return nil }
+func (h *testHandle) ReconcilerBuilder() *ctrlbuilder.Builder { return nil }

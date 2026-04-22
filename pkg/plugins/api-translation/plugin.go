@@ -19,9 +19,14 @@ package api_translation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/gateway-api-inference-extension/pkg/bbr/framework"
+	errcommon "sigs.k8s.io/gateway-api-inference-extension/pkg/common/error"
+	logutil "sigs.k8s.io/gateway-api-inference-extension/pkg/common/observability/logging"
 	"sigs.k8s.io/gateway-api-inference-extension/pkg/epp/framework/interface/plugin"
 
 	"github.com/opendatahub-io/ai-gateway-payload-processing/pkg/plugins/api-translation/translator"
@@ -42,26 +47,72 @@ const (
 var _ framework.RequestProcessor = &APITranslationPlugin{}
 var _ framework.ResponseProcessor = &APITranslationPlugin{}
 
-// APITranslationFactory defines the factory function for APITranslationPlugin.
-func APITranslationFactory(name string, _ json.RawMessage, _ framework.Handle) (framework.BBRPlugin, error) {
-	return NewAPITranslationPlugin().WithName(name), nil
+// apiTranslationConfig holds configuration for provider-specific translators.
+type apiTranslationConfig struct {
+	VertexOpenAI *vertexOpenAIConfig `json:"vertexOpenAI,omitempty"`
 }
 
-// NewAPITranslationPlugin creates a new plugin instance with all registered providers.
-func NewAPITranslationPlugin() *APITranslationPlugin {
+type vertexOpenAIConfig struct {
+	Project  string `json:"project"`
+	Location string `json:"location"`
+	Endpoint string `json:"endpoint"`
+}
+
+// APITranslationFactory defines the factory function for APITranslationPlugin.
+func APITranslationFactory(name string, rawConfig json.RawMessage, handle framework.Handle) (framework.BBRPlugin, error) {
+	var config apiTranslationConfig
+	if len(rawConfig) > 0 {
+		if err := json.Unmarshal(rawConfig, &config); err != nil {
+			return nil, fmt.Errorf("failed to parse api-translation plugin config: %w", err)
+		}
+	}
+
+	p, err := NewAPITranslationPlugin(handle.Context(), config)
+	if err != nil {
+		return nil, err
+	}
+	return p.WithName(name), nil
+}
+
+// NewAPITranslationPlugin creates a new plugin instance with the given config.
+// If vertexOpenAI config is provided, the vertex-openai translator is registered.
+// If vertexOpenAI config is provided but has empty fields, an error is returned.
+func NewAPITranslationPlugin(ctx context.Context, config apiTranslationConfig) (*APITranslationPlugin, error) {
+	// vertex (native GenerateContent) is not used in 3.4 ExternalModel flow.
+	// Uncomment when vertex (non-OpenAI) provider support is needed.
+	// vertexTranslator := vertex.NewVertexTranslator()
+	providers := map[string]translator.Translator{
+		provider.OpenAI:        openai.NewOpenAITranslator(),
+		provider.Anthropic:     anthropic.NewAnthropicTranslator(),
+		provider.AzureOpenAI:   azure.NewAzureOpenAITranslator(),
+		provider.BedrockOpenAI: bedrock.NewBedrockOpenAITranslator(),
+	}
+
+	if config.VertexOpenAI != nil {
+		if config.VertexOpenAI.Project == "" || config.VertexOpenAI.Location == "" || config.VertexOpenAI.Endpoint == "" {
+			return nil, fmt.Errorf("vertexOpenAI config requires non-empty project, location, and endpoint")
+		}
+		providers[provider.VertexOpenAI] = vertex.NewVertexOpenAITranslator(
+			config.VertexOpenAI.Project,
+			config.VertexOpenAI.Location,
+			config.VertexOpenAI.Endpoint,
+		)
+	}
+
+	keys := make([]string, 0, len(providers))
+	for key := range providers {
+		keys = append(keys, key)
+	}
+
+	log.FromContext(ctx).V(logutil.VERBOSE).Info("plugin initialized", "providers", strings.Join(keys, ","))
+
 	return &APITranslationPlugin{
 		typedName: plugin.TypedName{
 			Type: APITranslationPluginType,
 			Name: APITranslationPluginType,
 		},
-		providers: map[string]translator.Translator{
-			provider.OpenAI:        openai.NewOpenAITranslator(),
-			provider.Anthropic:     anthropic.NewAnthropicTranslator(),
-			provider.AzureOpenAI:   azure.NewAzureOpenAITranslator(),
-			provider.Vertex:        vertex.NewVertexTranslator(),
-			provider.BedrockOpenAI: bedrock.NewBedrockOpenAITranslator(),
-		},
-	}
+		providers: providers,
+	}, nil
 }
 
 // APITranslationPlugin translates inference API requests and responses between
@@ -97,6 +148,10 @@ func (p *APITranslationPlugin) ProcessRequest(ctx context.Context, cycleState *f
 
 	translatedBody, headersToMutate, headersToRemove, err := translator.TranslateRequest(request.Body)
 	if err != nil {
+		var commErr errcommon.Error
+		if errors.As(err, &commErr) {
+			return commErr
+		}
 		return fmt.Errorf("request translation failed for provider '%s' - %w", providerName, err)
 	}
 
@@ -137,6 +192,10 @@ func (p *APITranslationPlugin) ProcessResponse(ctx context.Context, cycleState *
 
 	translatedBody, err := translator.TranslateResponse(response.Body, model)
 	if err != nil {
+		var commErr errcommon.Error
+		if errors.As(err, &commErr) {
+			return commErr
+		}
 		return fmt.Errorf("response translation failed for provider '%s' - %w", providerName, err)
 	}
 
