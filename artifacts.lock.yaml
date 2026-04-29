@@ -1,0 +1,10 @@
+---
+metadata:
+  version: "1.0"
+artifacts:
+  - download_url: "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
+    checksum: "sha256:7c27adc64a84d1c0cc3dcf7bf4b6e916cc00f3f576a2dbac51b318d926032437"
+    filename: "kubectl-amd64"
+  - download_url: "https://dl.k8s.io/release/v1.31.0/bin/linux/arm64/kubectl"
+    checksum: "sha256:f42832db7d77897514639c6df38214a6d8ae1262ee34943364ec1ffaee6c009c"
+    filename: "kubectl-arm64"
