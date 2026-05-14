@@ -2,9 +2,9 @@
 metadata:
   version: "1.0"
 artifacts:
-  - download_url: "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
-    checksum: "sha256:7c27adc64a84d1c0cc3dcf7bf4b6e916cc00f3f576a2dbac51b318d926032437"
-    filename: "kubectl-amd64"
-  - download_url: "https://dl.k8s.io/release/v1.31.0/bin/linux/arm64/kubectl"
-    checksum: "sha256:f42832db7d77897514639c6df38214a6d8ae1262ee34943364ec1ffaee6c009c"
-    filename: "kubectl-arm64"
+  - download_url: "https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.21.15/openshift-client-linux-amd64-rhel9-4.21.15.tar.gz"
+    checksum: "sha256:1fa80bbf95a53c02d4f931c9bfcd4220b2c5d0ca9fd06abc94e4a9809c0443f4"
+    filename: "openshift-client-linux-amd64-rhel9-4.21.15.tar.gz"
+  - download_url: "https://mirror.openshift.com/pub/openshift-v4/aarch64/clients/ocp/4.21.15/openshift-client-linux-arm64-rhel9-4.21.15.tar.gz"
+    checksum: "sha256:fb7bccabe0aaaee66a836eaa2c0c1411d408e8b79b89349aeec2a660d9b5c64a"
+    filename: "openshift-client-linux-arm64-rhel9-4.21.15.tar.gz"
