@@ -32,21 +32,19 @@ RUN CGO_ENABLED=${CGO_ENABLED} GOEXPERIMENT=strictfipsruntime GOOS=${TARGETOS} G
     go test -c -o /e2e-tests.test ./test/e2e/ \
     -ldflags="-s -w"
 
-## Stage 2: Install FIPS-compliant kubectl from cachi2-prefetched OpenShift client tarball (rhel9, CGO+OpenSSL).
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:12db9874bd753eb98b1ab3d840e75de5d6842ac0604fbd68c012adefe97140be AS kubectl
-ARG TARGETARCH=amd64
-
+# Extract FIPS-compliant kubectl from cachi2-prefetched OpenShift client tarball (rhel9, CGO+OpenSSL).
+# Done in the builder stage since ubi-minimal does not ship tar.
 RUN tar -xzf /cachi2/output/deps/generic/openshift-client-linux-${TARGETARCH}-rhel9-4.21.15.tar.gz -C /tmp/ oc kubectl && \
     mv /tmp/kubectl /usr/local/bin/kubectl && \
     chmod +x /usr/local/bin/kubectl
 
-## Stage 3: Runtime
+## Stage 2: Runtime
 FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:12db9874bd753eb98b1ab3d840e75de5d6842ac0604fbd68c012adefe97140be
 
 WORKDIR /e2e
 
 COPY --from=builder /e2e-tests.test /e2e/e2e-tests.test
-COPY --from=kubectl /usr/local/bin/kubectl /usr/local/bin/kubectl
+COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY test/e2e/scripts/entrypoint.sh /e2e/entrypoint.sh
 
 RUN chmod +x /e2e/entrypoint.sh /e2e/e2e-tests.test && \
