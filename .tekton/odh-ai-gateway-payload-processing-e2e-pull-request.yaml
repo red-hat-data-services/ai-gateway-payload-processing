@@ -45,10 +45,7 @@ spec:
     value: true
   - name: prefetch-input
     value: |
-      [
-          {"type": "gomod", "path": "."},
-          {"type": "generic", "path": "."}
-        ]
+      [{"type": "gomod", "path": "."}]
   - name: build-image-index
     value: true
   - name: image-expires-after
