@@ -36,7 +36,7 @@ RUN CGO_ENABLED=${CGO_ENABLED} GOEXPERIMENT=strictfipsruntime GOOS=${TARGETOS} G
 FROM registry.redhat.io/openshift4/ose-cli:latest AS cli
 
 ## Stage 3: Runtime
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:dd334afa72444fa46238fcf9e6bd399245adf746378735348cf84b9dfdca38f1
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:57c8151c51445a07e503dab9dc9211dc3cdeac9d45ed81a10954b7d770659b3b
 
 WORKDIR /e2e
 
