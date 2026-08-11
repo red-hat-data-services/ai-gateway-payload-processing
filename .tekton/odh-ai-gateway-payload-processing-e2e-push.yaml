@@ -4,18 +4,17 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/red-hat-data-services/ai-gateway-payload-processing?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
-    pipelinesascode.tekton.dev/cancel-in-progress: "true"
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "main"
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: automation
     appstudio.openshift.io/component: odh-ai-gateway-payload-processing-e2e
     pipelines.appstudio.openshift.io/type: build
-  name: odh-ai-gateway-payload-processing-e2e-on-pull-request
+  name: odh-ai-gateway-payload-processing-e2e-on-push
   namespace: rhoai-tenant
 spec:
   params:
@@ -24,9 +23,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/rhoai-tenant/odh-ai-gateway-payload-processing-e2e:on-pr-{{revision}}
-  - name: image-expires-after
-    value: 5d
+    value: quay.io/redhat-user-workloads/rhoai-tenant/odh-ai-gateway-payload-processing-e2e:{{revision}}
   - name: dockerfile
     value: Dockerfile.konflux.e2e
   - name: path-context
