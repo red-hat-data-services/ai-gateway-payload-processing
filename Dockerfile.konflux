@@ -31,7 +31,7 @@ RUN VERSION_PKG="$(go list -f '{{.ImportPath}}' github.com/llm-d/llm-d-inference
 	go build -a -trimpath -ldflags="-s -w -X ${VERSION_PKG}.CommitSHA=${COMMIT_SHA} -X ${VERSION_PKG}.BuildRef=${BUILD_REF}" -o /bbr ./cmd
 
 # Multistage deploy
-FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal-pqc:latest
+FROM --platform=$TARGETPLATFORM registry.redhat.io/ubi9/ubi-minimal-pqc:latest
 
 WORKDIR /
 COPY --from=builder /bbr /bbr
