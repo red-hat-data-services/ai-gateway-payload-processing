@@ -34,3 +34,17 @@ To fix an existing unlabeled Secret:
 ```bash
 kubectl label secret <name> -n <namespace> inference.llm-d.ai/ipp-managed=true
 ```
+
+## Transport annotations
+
+`ExternalProvider` supports optional annotations to control upstream transport:
+
+| Annotation | Default | Description |
+|------------|---------|-------------|
+| `inference.opendatahub.io/port` | `443` | Backend port (1-65535) |
+| `inference.opendatahub.io/tls` | `"true"` | TLS origination: `"true"` or `"false"` |
+
+Notes:
+- `inference.opendatahub.io/tls` must be exactly `"true"` or `"false"` (lowercase string)
+- Disabling TLS (`"false"`) is not allowed with `apikey` or `sigv4` auth
+- Legacy annotations `maas.opendatahub.io/port` and `maas.opendatahub.io/tls` are migrated to the new keys
