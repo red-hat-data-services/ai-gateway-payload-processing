@@ -33,10 +33,10 @@ RUN CGO_ENABLED=${CGO_ENABLED} GOEXPERIMENT=strictfipsruntime GOOS=${TARGETOS} G
     -ldflags="-s -w"
 
 ## Stage 2: Get FIPS-compliant kubectl from entitled OpenShift CLI image
-FROM registry.redhat.io/openshift4/ose-cli-rhel9@sha256:fcb2150c4e497462c506d4415d1c3e3f814989a3be5d49064fb6c73557b3724b AS cli
+FROM registry.redhat.io/openshift4/ose-cli-rhel9@sha256:2a8b58f028a9a4a0345ad1f809e47fb9913d7f77c731bfd785819e1c71be9472 AS cli
 
 ## Stage 3: Runtime
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:2d4c4551af6831dcd26bbf86108c4385de5183ec8fe6b5868f6f9640fe47f4ed
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:6f3a78179e0b30b930a186e7f68a4af52e51bb82406c9653be10bddd624e40f5
 
 WORKDIR /e2e
 
