@@ -19,6 +19,7 @@ package model_provider_resolver
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -59,21 +60,71 @@ func (r *externalModelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	modelName := model.Spec.ModelName
-	if modelName == "" {
-		modelName = req.Name
+	// RHOAIENG-99761: AGC attachments (gatewayRefs) are served by
+	// ai-gateway-controller, and a foreign-only reference set is unservable
+	// by IPP (AGC skips cross-namespace refs too, RHOAIENG-90804). So are the
+	// models AGC serves through their own Praxis tenant (RHOAIENG-102557). In
+	// every case IPP has nothing to serve: stop any previously cached mapping
+	// (a legacy object edited to either shape, or a model cached before AGC
+	// served it) and never add such models to the store; a same-named model
+	// AGC serves must not displace a tenant model's mapping.
+	if excludedFromStore(model) {
+		removed := r.store.deleteModel(req.NamespacedName)
+		logger.Info("ExternalModel served by AGC excluded from store", "name", req.Name, "namespace", req.Namespace)
+		return ctrl.Result{}, r.restoreModelNames(ctx, removed)
 	}
+
+	return r.cacheModel(ctx, model), nil
+}
+
+// excludedFromStore reports whether AGC, not IPP, serves the model (see
+// Reconcile).
+func excludedFromStore(model *inferencev1alpha1.ExternalModel) bool {
+	return ctrlcommon.IsAGCManaged(model) || ctrlcommon.IsAGCServed(model)
+}
+
+// clientModelName is the client-facing name the store keys the model by.
+func clientModelName(model *inferencev1alpha1.ExternalModel) string {
+	if model.Spec.ModelName != "" {
+		return model.Spec.ModelName
+	}
+	return model.Name
+}
+
+// restoreModelNames maps each modelName an excluded model held to another
+// ExternalModel of that name. The excluded model, cached before AGC served
+// it, displaced that model's mapping, which would otherwise stay missing until
+// the model is reconciled again.
+func (r *externalModelReconciler) restoreModelNames(ctx context.Context, names []string) error {
+	if len(names) == 0 {
+		return nil
+	}
+	models := &inferencev1alpha1.ExternalModelList{}
+	if err := r.List(ctx, models); err != nil {
+		return fmt.Errorf("unable to list ExternalModels to restore %v: %w", names, err)
+	}
+	for i := range models.Items {
+		model := &models.Items[i]
+		if !slices.Contains(names, clientModelName(model)) || !model.GetDeletionTimestamp().IsZero() || excludedFromStore(model) {
+			continue
+		}
+		r.cacheModel(ctx, model)
+	}
+	return nil
+}
+
+// cacheModel stores the model's mapping with the refs whose providers are
+// available in the store.
+func (r *externalModelReconciler) cacheModel(ctx context.Context, model *inferencev1alpha1.ExternalModel) ctrl.Result {
+	logger := log.FromContext(ctx).V(logutil.DEFAULT)
+	modelName := clientModelName(model)
 
 	// Resolve all refs whose providers are available in the store.
 	var resolved []*resolvedProviderRef
-	unsupportedNamespace := false
 	for i := range model.Spec.ExternalProviderRefs {
 		ref := &model.Spec.ExternalProviderRefs[i]
-		resolvedRef, err := r.resolveRef(req.Namespace, ref)
+		resolvedRef, err := r.resolveRef(model.Namespace, ref)
 		if err != nil {
-			if ref.Ref.Namespace != "" && ref.Ref.Namespace != req.Namespace {
-				unsupportedNamespace = true
-			}
 			logger.Error(err, "failed to resolve ref, skipping", "provider", model.Spec.ExternalProviderRefs[i].Ref.Name)
 			continue
 		}
@@ -81,21 +132,25 @@ func (r *externalModelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if len(resolved) == 0 {
-		if unsupportedNamespace {
-			// Stop serving a previously cached local provider after an update to
-			// an unsupported foreign namespace.
-			r.store.deleteModel(req.NamespacedName)
-		}
+		// A mixed-shape model whose local references all fail resolution
+		// keeps its last-known-good mapping, exactly like a local-only
+		// model: the shape is servable, so this is a transient readiness
+		// failure rather than a handoff.
 		logger.Info("no ExternalProvider available for any ref, requeuing")
-		return ctrl.Result{RequeueAfter: providerRequeueDelay}, nil
+		return ctrl.Result{RequeueAfter: providerRequeueDelay}
 	}
 
-	r.store.addOrUpdateModel(modelName, &externalModelInfo{owner: req.NamespacedName, modelName: modelName, refs: resolved})
+	r.store.addOrUpdateModel(modelName, &externalModelInfo{owner: client.ObjectKeyFromObject(model), modelName: modelName, refs: resolved})
 	logger.Info("updated model store", "modelName", modelName, "resolvedRefs", len(resolved))
-	return ctrl.Result{}, nil
+	return ctrl.Result{}
 }
 
 // resolveRef resolves a single ExternalProviderRef to provider info.
+// Cross-namespace references are never resolved by IPP: a foreign-only
+// reference set is AGC-managed and excluded before this runs
+// (RHOAIENG-99761), so this error can only surface for a mixed-shape model,
+// whose remaining local references are resolved independently of the
+// skipped foreign one.
 func (r *externalModelReconciler) resolveRef(namespace string, ref *inferencev1alpha1.ExternalProviderRef) (*resolvedProviderRef, error) {
 	if ref.Ref.Namespace != "" && ref.Ref.Namespace != namespace {
 		return nil, fmt.Errorf("cross-namespace ExternalProvider reference %q is not supported", ref.Ref.Namespace+"/"+ref.Ref.Name)
