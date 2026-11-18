@@ -18,6 +18,8 @@ USER root
 # Dependencies
 WORKDIR /src
 COPY go.mod go.sum ./
+# Local replace for RHAI-50090 MaxRecvMsgSize backport (see go.mod)
+COPY third_party/ third_party/
 RUN go mod download
 
 # Sources
